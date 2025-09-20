@@ -31,7 +31,7 @@ st.set_page_config(page_title="🕉️ Samsara Helix v∞ Limitless", layout="wi
 def init_session_state():
     defaults = {
         'chat_messages': [],
-        'chat_input': "",
+        'chat_input_value': "", # New key for chat input value
         'fractal_params': {
             'zoom': 1.0,
             'center_real': -0.7269,
@@ -39,11 +39,11 @@ def init_session_state():
             'iterations': 100,
             'width': 600,
             'height': 450,
-            'auto_generate': False, # Re-added auto-generate
+            'auto_generate': False,
             'colormap': 'hot',
             'fractal_type': 'mandelbrot',
             'color_invert': False,
-            'show_grid': False, # Placeholder for future feature
+            'show_grid': False,
         },
         'audio_params': {
             'base_frequency': 432,
@@ -66,7 +66,7 @@ def init_session_state():
             'language': 'English',
             'auto_generate_fractal': False
         },
-        'rerun_triggered': False # New flag to manage reruns
+        'rerun_triggered': False
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -212,7 +212,7 @@ def generate_animation(params):
             }
             img_array = generate_fractal(fractal_params)
             if img_array is None:
-                return None
+                return None # Propagate None if fractal generation fails
             frames.append(img_array)
         buffer = io.BytesIO()
         imageio.mimsave(buffer, frames, format='GIF', duration=0.1)
@@ -258,13 +258,14 @@ def chat_ui():
             st.markdown(f'<div class="assistant-msg">{msg["content"]}</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Input for new messages
-    user_input = st.text_input("Type your message here...", key="chat_input", on_change=None) # on_change removed for better control
-    send_button = st.button("Send")
+    # Callback function to handle sending message and clearing input
+    def send_message_callback():
+        user_input = st.session_state.chat_input_widget # Get value from the widget
+        if not user_input:
+            return
 
-    if send_button and user_input:
         st.session_state.chat_messages.append({"role": "user", "content": user_input})
-        st.session_state.chat_input = "" # Clear input box immediately
+        st.session_state.chat_input_value = "" # Clear the value in session state
 
         command_response = handle_chat_command(user_input)
         if command_response:
@@ -276,6 +277,17 @@ def chat_ui():
                 st.session_state.chat_messages.append({"role": "assistant", "content": ai_response})
 
         st.session_state.rerun_triggered = True # Trigger rerun to update chat display
+
+    # Input for new messages
+    st.text_input(
+        "Type your message here...",
+        key="chat_input_widget", # Unique key for the widget
+        value=st.session_state.chat_input_value, # Bind to session state value
+        on_change=send_message_callback, # Call callback when Enter is pressed
+        args=() # No arguments needed for on_change callback
+    )
+    st.button("Send", on_click=send_message_callback)
+
 
 # --- Audio Synthesis UI ---
 def audio_ui():
@@ -308,7 +320,7 @@ def animation_ui():
     if st.button("Generate Animation"):
         with st.spinner("Generating animation..."):
             gif_buffer = generate_animation(params)
-            if gif_buffer:
+            if gif_buffer: # Check if gif_buffer is not None
                 # Ensure the buffer is at the beginning for st.image
                 gif_buffer.seek(0)
                 st.image(gif_buffer.getvalue(), format="GIF", use_container_width=True) # Use getvalue() for BytesIO
@@ -368,24 +380,27 @@ with tabs[0]: # Fractal Studio
 
     params = st.session_state.fractal_params
 
+    # Auto-generate checkbox moved outside the form
+    auto_generate_changed = st.checkbox("Auto-generate fractal on parameter change", value=params['auto_generate'], key="auto_generate_fractal_checkbox")
+    if auto_generate_changed != params['auto_generate']:
+        params['auto_generate'] = auto_generate_changed
+        st.session_state.rerun_triggered = True # Trigger rerun if auto-generate state changes
+
     # Use a form to group inputs and prevent immediate reruns on every slider change
     with st.form("fractal_form"):
         col1, col2 = st.columns(2)
         with col1:
-            params['zoom'] = st.slider("Zoom", 0.0001, 2000.0, params['zoom'], step=0.001, format="%.4f")
-            params['center_real'] = st.number_input("Center Real", value=params['center_real'], format="%.6f")
-            params['iterations'] = st.slider("Iterations", 10, 1000, params['iterations'])
-            params['fractal_type'] = st.selectbox("Fractal Type", ['mandelbrot', 'julia'], index=['mandelbrot', 'julia'].index(params['fractal_type']))
+            params['zoom'] = st.slider("Zoom", 0.0001, 2000.0, params['zoom'], step=0.001, format="%.4f", key="fractal_zoom")
+            params['center_real'] = st.number_input("Center Real", value=params['center_real'], format="%.6f", key="fractal_center_real")
+            params['iterations'] = st.slider("Iterations", 10, 1000, params['iterations'], key="fractal_iterations")
+            params['fractal_type'] = st.selectbox("Fractal Type", ['mandelbrot', 'julia'], index=['mandelbrot', 'julia'].index(params['fractal_type']), key="fractal_type_select")
         with col2:
-            params['center_imag'] = st.number_input("Center Imaginary", value=params['center_imag'], format="%.6f")
-            params['width'] = st.slider("Width (px)", 200, 1024, params['width'])
-            params['height'] = st.slider("Height (px)", 200, 1024, params['height'])
-            params['colormap'] = st.selectbox("Color Map", plt.colormaps(), index=plt.colormaps().index(params['colormap']))
-            params['color_invert'] = st.checkbox("Invert Colors", value=params['color_invert'])
-            params['show_grid'] = st.checkbox("Show Grid Overlay (Future Feature)", value=params['show_grid'], disabled=True) # Disabled for now
-
-        # Auto-generate checkbox
-        params['auto_generate'] = st.checkbox("Auto-generate fractal on parameter change", value=params['auto_generate'])
+            params['center_imag'] = st.number_input("Center Imaginary", value=params['center_imag'], format="%.6f", key="fractal_center_imag")
+            params['width'] = st.slider("Width (px)", 200, 1024, params['width'], key="fractal_width")
+            params['height'] = st.slider("Height (px)", 200, 1024, params['height'], key="fractal_height")
+            params['colormap'] = st.selectbox("Color Map", plt.colormaps(), index=plt.colormaps().index(params['colormap']), key="fractal_colormap")
+            params['color_invert'] = st.checkbox("Invert Colors", value=params['color_invert'], key="fractal_color_invert")
+            params['show_grid'] = st.checkbox("Show Grid Overlay (Future Feature)", value=params['show_grid'], disabled=True, key="fractal_show_grid")
 
         submitted = st.form_submit_button("Generate Fractal Image Now")
 
