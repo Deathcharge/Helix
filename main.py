@@ -433,4 +433,4 @@ with tabs[6]: # Export
 # Only rerun if explicitly triggered by an action that needs a full refresh
 if st.session_state.get('rerun_triggered', False):
     st.session_state.rerun_triggered = False # Reset the flag
-    st.experimental_rerun()
+    st.rerun()
