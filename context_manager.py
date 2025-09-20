@@ -11,7 +11,7 @@ except ImportError:
 import openai
 
 from agents import AGENTS, DEFAULT_STATE
-from ucf_protocol import format_ucf_message
+from ucf_protocol import format_ucf_message  # Ensure this file is in the same directory
 
 def load_openai_api_key() -> str:
     api_key = os.environ.get("OPENAI_API_KEY")
@@ -82,7 +82,7 @@ class SamsaraHelixContext:
             ]
             recent_history = self.history[-5:]
             for hist_msg in recent_history:
-                if hist_msg.startswith(":User  "):
+                if hist_msg.startswith(":User   "):
                     messages.append({"role": "user", "content": hist_msg[len(":User   "):]})
                 elif hist_msg.startswith("Samsara Helix:"):
                     messages.append({"role": "assistant", "content": hist_msg[len("Samsara Helix: "):]})
