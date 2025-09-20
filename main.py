@@ -6,6 +6,11 @@ import io
 import time
 from PIL import Image
 
+can_start, message = st.session_state.samsara_helix_context.can_start_new_session()
+if not can_start:
+    st.warning(message)
+    st.stop()
+
 # Attempt to import optional packages with error handling
 try:
     import soundfile as sf
