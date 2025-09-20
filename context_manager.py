@@ -10,12 +10,21 @@ from ucf_protocol import format_ucf_message
 # --- OpenAI API Key Configuration ---
 # It's crucial to load the API key securely.
 # For Streamlit Community Cloud, use st.secrets["OPENAI_API_KEY"].
-# For local development, you can use environment variables.
+# For local development, you can use environment variables. 
+# Try to get OpenAI API key from environment or Streamlit secrets if available
+openai_api_key = os.environ.get("OPENAI_API_KEY")
 try:
-    openai.api_key = os.environ.get("OPENAI_API_KEY") or st.secrets["OPENAI_API_KEY"]
-except Exception:
-    st.error("OpenAI API key not found. Please set it as an environment variable (OPENAI_API_KEY) or in Streamlit secrets.")
-    openai.api_key = "YOUR_FALLBACK_KEY_OR_RAISE_ERROR" # Fallback or raise error
+    import streamlit as st
+    if not openai_api_key:
+        openai_api_key = st.secrets.get("OPENAI_API_KEY", None)
+except ImportError:
+    pass
+
+if not openai_api_key:
+    raise ValueError("OpenAI API key not found. Please set OPENAI_API_KEY environment variable or Streamlit secrets.")
+
+import openai
+openai.api_key = openai_api_key" # Fallback or raise error
 
 class SamsaraHelixContext:
     def __init__(self):
