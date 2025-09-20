@@ -20,4 +20,7 @@ def format_ucf_message(agent, content_dict):
     if 'metadata' in content_dict:
         content += "Metadata / Tags:\n" + content_dict['metadata'] + "\n\n"
     footer = (
-        "FO
+        "FOOTER\n"
+        "UCF HEADER END\n"
+    )
+    return header + content + footer
