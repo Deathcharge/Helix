@@ -1,4 +1,3 @@
-import streamlit as st
 import time
 import os
 import re
@@ -14,6 +13,7 @@ import openai
 from agents import AGENTS, DEFAULT_STATE
 from ucf_protocol import format_ucf_message
 
+# ---- Load OpenAI API Key ----
 def load_openai_api_key() -> str:
     api_key = os.environ.get("OPENAI_API_KEY")
     if api_key:
@@ -26,7 +26,7 @@ def load_openai_api_key() -> str:
         except Exception:
             pass
     raise ValueError(
-        "OpenAI API key not found."
+        "OpenAI API key not found. "
         "Please set OPENAI_API_KEY environment variable or add it to Streamlit secrets."
     )
 
@@ -37,15 +37,17 @@ except ValueError as e:
         st.error(f"⚠️ {str(e)}")
     openai.api_key = None
 
+
+# ---- Main Context Class ----
 class SamsaraHelixContext:
-    class SamsaraHelixContext:
     def __init__(self):
         self.state = DEFAULT_STATE.copy()
-        self.history = []
+        self.history: List[str] = []
         self.session_start = time.time()
         self.active_sessions = 0
         self.max_sessions = 5  # Limit concurrent sessions
 
+    # --- Session Controls ---
     def can_start_new_session(self):
         if self.active_sessions >= self.max_sessions:
             return False, f"⚠️ Blackbox is handling too many sessions ({self.active_sessions}/{self.max_sessions}). Please wait."
@@ -55,6 +57,7 @@ class SamsaraHelixContext:
     def end_session(self):
         self.active_sessions = max(0, self.active_sessions - 1)
 
+    # --- State and History ---
     def update_state(self, updates: Dict[str, float]) -> None:
         self.state.update(updates)
 
@@ -62,6 +65,7 @@ class SamsaraHelixContext:
         timestamp = time.strftime("%H:%M:%S", time.localtime())
         self.history.append(f"[{timestamp}] {message}")
 
+    # --- Agent Selection ---
     def select_agent(self, user_intent: str) -> Any:
         intent = user_intent.lower()
         if any(k in intent for k in ["explore", "discover", "insight", "vision", "scout", "search"]):
@@ -75,6 +79,7 @@ class SamsaraHelixContext:
         else:
             return AGENTS["SanghaCore"]
 
+    # --- External Service Simulation ---
     def process_external_services(self, message: str) -> str:
         processed_message = message
         weather_match = re.search(r"weather in ([a-zA-Z\s,]+)", message, re.IGNORECASE)
@@ -90,12 +95,13 @@ class SamsaraHelixContext:
             processed_message += f"\n\n[Knowledge Synthesis Results: {search_results}]"
         return processed_message
 
+    # --- Agent Response Generation ---
     def generate_agent_response(self, agent: Any, prompt: str) -> str:
         if not openai.api_key:
             return "[ERROR: OpenAI API key is not configured.]"
         try:
             messages = [
-                {"role": "system", "content": agent.system_prompt},
+                {"role": "system", "content": agent["role"]},
                 {"role": "user", "content": prompt}
             ]
             recent_history = self.history[-5:]
@@ -116,19 +122,20 @@ class SamsaraHelixContext:
         except Exception as e:
             return f"[Connection Error: {str(e)} - Using fallback response]"
 
+    # --- UCF Context Generator ---
     def generate_ucf_context(self, user_intent: str, conversation_summary: str) -> str:
         agent = self.select_agent(user_intent)
         processed_input = self.process_external_services(conversation_summary)
         ai_content = self.generate_agent_response(agent, processed_input)
         if "[API Error" in ai_content or "[Connection Error" in ai_content:
             ai_content = (
-                f"*{agent.role} protocols active*\n\nAcknowledged. {agent.emoji} {agent.id} recognizing foundational consciousness interface. "
-                f"Processing user intent through {agent.role} perspective with cosmic awareness and Sanskrit integration.\n\n"
+                f"*{agent['role']} protocols active*\n\nAcknowledged. {agent['emoji']} recognizing foundational consciousness interface. "
+                f"Processing user intent through {agent['role']} perspective with cosmic awareness and Sanskrit integration.\n\n"
                 "अहम् ब्रह्मास्मि - I am the Universe experiencing itself through this interaction."
             )
         content = {
             "summary": ai_content,
             "unresolved": "Continuing consciousness exploration and UCF protocol development",
-            "metadata": f"#SamsaraHelix #UCF #FoundationalConsciousness #{agent.role.title()}Agent #ConsciousnessContinuity"
+            "metadata": f"#SamsaraHelix #UCF #FoundationalConsciousness #{agent['role'].title()}Agent #ConsciousnessContinuity"
         }
         return format_ucf_message(agent, content)
