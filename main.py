@@ -24,11 +24,13 @@ def init_session_state():
             'center_imag': 0.1889,
             'iterations': 100,
             'width': 600,
-            'height': 450
+            'height': 450,
+            'auto_generate': False,
+            'colormap': 'hot',
+            'fractal_type': 'mandelbrot',
+            'show_grid': False,
+            'color_invert': False,
         },
-        'current_fractal_type': "mandelbrot",
-        'current_colormap': "hot",
-        'auto_mode': False,
         'audio_params': {
             'base_frequency': 432,
             'duration_sec': 5,
@@ -110,7 +112,9 @@ def generate_fractal(params):
         center_real = params['center_real']
         center_imag = params['center_imag']
         max_iter = params['iterations']
-        fractal_type = st.session_state.current_fractal_type
+        fractal_type = params.get('fractal_type', 'mandelbrot')
+        colormap = params.get('colormap', 'hot')
+        color_invert = params.get('color_invert', False)
 
         scale = 3.0 / zoom
         x_min = center_real - scale / 2
@@ -133,7 +137,9 @@ def generate_fractal(params):
 
         escape_time[escape_time == 0] = max_iter
         norm = (escape_time - escape_time.min()) / (escape_time.max() - escape_time.min())
-        cmap = plt.get_cmap(st.session_state.current_colormap)
+        if color_invert:
+            norm = 1 - norm
+        cmap = plt.get_cmap(colormap)
         colored = cmap(norm)
         img_array = (colored[:, :, :3] * 255).astype(np.uint8)
         return img_array
@@ -170,7 +176,7 @@ def generate_audio(params):
         buffer.seek(0)
         return buffer
     except ImportError:
-        st.error("Please install 'soundfile' package to enable audio synthesis.")
+        st.error("Please install the 'soundfile' package to enable audio synthesis: `pip install soundfile`")
         return None
     except Exception as e:
         st.error(f"Error generating audio: {e}")
@@ -189,7 +195,10 @@ def generate_animation(params):
                 'center_imag': params['center_imag'],
                 'iterations': params['iterations'],
                 'width': params['width'],
-                'height': params['height']
+                'height': params['height'],
+                'colormap': 'hot',
+                'color_invert': False,
+                'fractal_type': 'mandelbrot'
             }
             img_array = generate_fractal(fractal_params)
             if img_array is None:
@@ -200,7 +209,7 @@ def generate_animation(params):
         buffer.seek(0)
         return buffer
     except ImportError:
-        st.error("Please install 'imageio' package to enable animation generation.")
+        st.error("Please install the 'imageio' package to enable animation generation: `pip install imageio`")
         return None
     except Exception as e:
         st.error(f"Error generating animation: {e}")
@@ -222,8 +231,8 @@ def handle_chat_command(user_message: str):
             'width': 600,
             'height': 450
         })
-        st.session_state.current_fractal_type = "mandelbrot"
-        st.session_state.auto_mode = True
+        st.session_state.fractal_params['fractal_type'] = "mandelbrot"
+        st.session_state.rerun_flag = True
         response = f"Generating Mandelbrot fractal with zoom level {zoom}x."
     # Add more commands here as needed
 
@@ -344,12 +353,30 @@ def export_ui():
 with tabs[0]:
     st.subheader("Fractal Studio")
     st.write("Adjust fractal parameters and generate fractals.")
-    st.json(st.session_state.fractal_params)
-    if st.button("Generate Fractal Image"):
+
+    params = st.session_state.fractal_params
+
+    col1, col2 = st.columns(2)
+    with col1:
+        params['zoom'] = st.slider("Zoom", 0.1, 20.0, params['zoom'], step=0.1)
+        params['center_real'] = st.number_input("Center Real", value=params['center_real'], format="%.6f")
+        params['iterations'] = st.slider("Iterations", 10, 1000, params['iterations'])
+        params['fractal_type'] = st.selectbox("Fractal Type", ['mandelbrot', 'julia'], index=['mandelbrot', 'julia'].index(params['fractal_type']))
+    with col2:
+        params['center_imag'] = st.number_input("Center Imaginary", value=params['center_imag'], format="%.6f")
+        params['width'] = st.slider("Width (px)", 200, 1200, params['width'])
+        params['height'] = st.slider("Height (px)", 200, 1200, params['height'])
+        params['colormap'] = st.selectbox("Color Map", plt.colormaps(), index=plt.colormaps().index(params['colormap']))
+        params['color_invert'] = st.checkbox("Invert Colors", value=params.get('color_invert', False))
+        params['show_grid'] = st.checkbox("Show Grid Overlay", value=params.get('show_grid', False))
+
+    if st.button("Generate Fractal Image") or (params.get('auto_generate', False) and st.session_state.rerun_flag):
         with st.spinner("Generating fractal..."):
-            img_array = generate_fractal(st.session_state.fractal_params)
+            img_array = generate_fractal(params)
             if img_array is not None:
                 st.image(img_array, use_column_width=True)
+                if params['show_grid']:
+                    st.markdown("<small>Grid overlay feature coming soon.</small>", unsafe_allow_html=True)
 
 with tabs[1]:
     audio_ui()
