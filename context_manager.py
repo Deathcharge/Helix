@@ -1,3 +1,4 @@
+import streamlit as st
 import time
 import os
 import re
@@ -29,7 +30,12 @@ def load_openai_api_key() -> str:
         "Please set OPENAI_API_KEY environment variable or add it to Streamlit secrets."
     )
 
-openai.api_key = load_openai_api_key()
+try:
+    openai.api_key = load_openai_api_key()
+except ValueError as e:
+    if st is not None:
+        st.error(f"⚠️ {str(e)}")
+    openai.api_key = None
 
 class SamsaraHelixContext:
     def __init__(self):
