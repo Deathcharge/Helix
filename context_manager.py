@@ -26,7 +26,7 @@ def load_openai_api_key() -> str:
         except Exception:
             pass
     raise ValueError(
-        "OpenAI API key not found. "
+        "OpenAI API key not found."
         "Please set OPENAI_API_KEY environment variable or add it to Streamlit secrets."
     )
 
