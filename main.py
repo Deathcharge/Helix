@@ -359,6 +359,9 @@ def export_ui():
         )
 
 # --- Render tabs ---
+# THIS LINE WAS MOVED UP TO FIX THE NAMERROR
+tabs = st.tabs(["Fractal Studio", "Audio Synthesis", "Chat", "Animation", "Gallery", "Settings", "Export"])
+
 with tabs[0]: # Fractal Studio
     st.subheader("Fractal Studio")
     st.write("Adjust fractal parameters and generate fractals.")
