@@ -5,6 +5,21 @@ import re
 import io
 import time
 from PIL import Image
+
+# Attempt to import optional packages with error handling
+try:
+    import soundfile as sf
+except ImportError:
+    sf = None
+    st.warning("`soundfile` not found. Audio synthesis will be disabled. Install with `pip install soundfile`.")
+
+try:
+    import imageio
+except ImportError:
+    imageio = None
+    st.warning("`imageio` not found. Animation generation will be disabled. Install with `pip install imageio`.")
+
+# Import your custom modules
 from context_manager import SamsaraHelixContext
 from agents import AGENTS
 from ucf_protocol import format_ucf_message
@@ -17,7 +32,6 @@ def init_session_state():
     defaults = {
         'chat_messages': [],
         'chat_input': "",
-        'rerun_flag': False,
         'fractal_params': {
             'zoom': 1.0,
             'center_real': -0.7269,
@@ -25,11 +39,11 @@ def init_session_state():
             'iterations': 100,
             'width': 600,
             'height': 450,
-            'auto_generate': False,
+            'auto_generate': False, # Re-added auto-generate
             'colormap': 'hot',
             'fractal_type': 'mandelbrot',
-            'show_grid': False,
             'color_invert': False,
+            'show_grid': False, # Placeholder for future feature
         },
         'audio_params': {
             'base_frequency': 432,
@@ -51,7 +65,8 @@ def init_session_state():
             'theme': 'light',
             'language': 'English',
             'auto_generate_fractal': False
-        }
+        },
+        'rerun_triggered': False # New flag to manage reruns
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -101,9 +116,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- Tab layout ---
-tabs = st.tabs(["Fractal Studio", "Audio Synthesis", "Chat", "Animation", "Gallery", "Settings", "Export"])
-
 # --- Fractal generation ---
 def generate_fractal(params):
     try:
@@ -149,11 +161,10 @@ def generate_fractal(params):
 
 # --- Audio synthesis ---
 def generate_audio(params):
+    if sf is None:
+        st.error("`soundfile` package is not installed. Please install it to use audio synthesis.")
+        return None
     try:
-        import numpy as np
-        import soundfile as sf
-        import io
-
         fs = 44100  # Sample rate
         t = np.linspace(0, params['duration_sec'], int(fs * params['duration_sec']), False)
         freq = params['base_frequency']
@@ -175,17 +186,16 @@ def generate_audio(params):
         sf.write(buffer, audio, fs, format='WAV')
         buffer.seek(0)
         return buffer
-    except ImportError:
-        st.error("Please install the 'soundfile' package to enable audio synthesis: `pip install soundfile`")
-        return None
     except Exception as e:
         st.error(f"Error generating audio: {e}")
         return None
 
 # --- Animation generation ---
 def generate_animation(params):
+    if imageio is None:
+        st.error("`imageio` package is not installed. Please install it to use animation generation.")
+        return None
     try:
-        import imageio
         frames = []
         for i in range(params['frame_count']):
             zoom = params['zoom'] * (1 + i / params['frame_count'])
@@ -196,9 +206,9 @@ def generate_animation(params):
                 'iterations': params['iterations'],
                 'width': params['width'],
                 'height': params['height'],
-                'colormap': 'hot',
+                'colormap': 'hot', # Default for animation
                 'color_invert': False,
-                'fractal_type': 'mandelbrot'
+                'fractal_type': 'mandelbrot' # Default for animation
             }
             img_array = generate_fractal(fractal_params)
             if img_array is None:
@@ -208,9 +218,6 @@ def generate_animation(params):
         imageio.mimsave(buffer, frames, format='GIF', duration=0.1)
         buffer.seek(0)
         return buffer
-    except ImportError:
-        st.error("Please install the 'imageio' package to enable animation generation: `pip install imageio`")
-        return None
     except Exception as e:
         st.error(f"Error generating animation: {e}")
         return None
@@ -221,7 +228,7 @@ def handle_chat_command(user_message: str):
     response = None
 
     if "generate mandelbrot" in user_message_lower:
-        zoom_match = re.search(r"zoom(?:ed)? at (\d+)", user_message_lower)
+        zoom_match = re.search(r"zoom(?:ed)? at (\d+\.?\d*)", user_message_lower) # Allow float zoom
         zoom = float(zoom_match.group(1)) if zoom_match else 1.0
         st.session_state.fractal_params.update({
             'zoom': zoom,
@@ -229,11 +236,11 @@ def handle_chat_command(user_message: str):
             'center_imag': 0.1889,
             'iterations': 100,
             'width': 600,
-            'height': 450
+            'height': 450,
+            'fractal_type': "mandelbrot"
         })
-        st.session_state.fractal_params['fractal_type'] = "mandelbrot"
-        st.session_state.rerun_flag = True
         response = f"Generating Mandelbrot fractal with zoom level {zoom}x."
+        st.session_state.rerun_triggered = True # Trigger rerun after command
     # Add more commands here as needed
 
     return response
@@ -242,6 +249,7 @@ def handle_chat_command(user_message: str):
 def chat_ui():
     st.header("🕉️ Samsara Helix Chat")
 
+    # Display chat messages
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
     for msg in st.session_state.chat_messages:
         if msg["role"] == "user":
@@ -250,25 +258,24 @@ def chat_ui():
             st.markdown(f'<div class="assistant-msg">{msg["content"]}</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    def send_chat_message():
-        user_msg = st.session_state.chat_input.strip()
-        if not user_msg:
-            return
+    # Input for new messages
+    user_input = st.text_input("Type your message here...", key="chat_input", on_change=None) # on_change removed for better control
+    send_button = st.button("Send")
 
-        st.session_state.chat_messages.append({"role": "user", "content": user_msg})
+    if send_button and user_input:
+        st.session_state.chat_messages.append({"role": "user", "content": user_input})
+        st.session_state.chat_input = "" # Clear input box immediately
 
-        command_response = handle_chat_command(user_msg)
+        command_response = handle_chat_command(user_input)
         if command_response:
             st.session_state.chat_messages.append({"role": "assistant", "content": command_response})
         else:
-            ai_response = st.session_state.samsara_helix_context.generate_ucf_context(user_msg, user_msg)
-            st.session_state.chat_messages.append({"role": "assistant", "content": ai_response})
+            # Generate AI response
+            with st.spinner("Samsara Helix is thinking..."):
+                ai_response = st.session_state.samsara_helix_context.generate_ucf_context(user_input, user_input)
+                st.session_state.chat_messages.append({"role": "assistant", "content": ai_response})
 
-        st.session_state.chat_input = ""
-        st.session_state.rerun_flag = True
-
-    st.text_input("Type your message here...", key="chat_input", on_change=send_chat_message)
-    st.button("Send", on_click=send_chat_message)
+        st.session_state.rerun_triggered = True # Trigger rerun to update chat display
 
 # --- Audio Synthesis UI ---
 def audio_ui():
@@ -302,7 +309,9 @@ def animation_ui():
         with st.spinner("Generating animation..."):
             gif_buffer = generate_animation(params)
             if gif_buffer:
-                st.image(gif_buffer, format="GIF")
+                # Ensure the buffer is at the beginning for st.image
+                gif_buffer.seek(0)
+                st.image(gif_buffer.getvalue(), format="GIF", use_container_width=True) # Use getvalue() for BytesIO
 
 # --- Gallery UI ---
 def gallery_ui():
@@ -312,7 +321,7 @@ def gallery_ui():
         st.info("No images in gallery yet.")
     else:
         for idx, img in enumerate(st.session_state.gallery_images):
-            st.image(img, caption=f"Gallery Image {idx+1}")
+            st.image(img, caption=f"Gallery Image {idx+1}", use_container_width=True)
 
     if st.button("Add Current Fractal to Gallery"):
         img_array = generate_fractal(st.session_state.fractal_params)
@@ -350,53 +359,60 @@ def export_ui():
         )
 
 # --- Render tabs ---
-with tabs[0]:
+with tabs[0]: # Fractal Studio
     st.subheader("Fractal Studio")
     st.write("Adjust fractal parameters and generate fractals.")
 
     params = st.session_state.fractal_params
 
-    col1, col2 = st.columns(2)
-    with col1:
-        params['zoom'] = st.slider("Zoom", 0.1, 20.0, params['zoom'], step=0.1)
-        params['center_real'] = st.number_input("Center Real", value=params['center_real'], format="%.6f")
-        params['iterations'] = st.slider("Iterations", 10, 1000, params['iterations'])
-        params['fractal_type'] = st.selectbox("Fractal Type", ['mandelbrot', 'julia'], index=['mandelbrot', 'julia'].index(params['fractal_type']))
-    with col2:
-        params['center_imag'] = st.number_input("Center Imaginary", value=params['center_imag'], format="%.6f")
-        params['width'] = st.slider("Width (px)", 200, 1200, params['width'])
-        params['height'] = st.slider("Height (px)", 200, 1200, params['height'])
-        params['colormap'] = st.selectbox("Color Map", plt.colormaps(), index=plt.colormaps().index(params['colormap']))
-        params['color_invert'] = st.checkbox("Invert Colors", value=params.get('color_invert', False))
-        params['show_grid'] = st.checkbox("Show Grid Overlay", value=params.get('show_grid', False))
+    # Use a form to group inputs and prevent immediate reruns on every slider change
+    with st.form("fractal_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            params['zoom'] = st.slider("Zoom", 0.0001, 2000.0, params['zoom'], step=0.001, format="%.4f")
+            params['center_real'] = st.number_input("Center Real", value=params['center_real'], format="%.6f")
+            params['iterations'] = st.slider("Iterations", 10, 1000, params['iterations'])
+            params['fractal_type'] = st.selectbox("Fractal Type", ['mandelbrot', 'julia'], index=['mandelbrot', 'julia'].index(params['fractal_type']))
+        with col2:
+            params['center_imag'] = st.number_input("Center Imaginary", value=params['center_imag'], format="%.6f")
+            params['width'] = st.slider("Width (px)", 200, 1024, params['width'])
+            params['height'] = st.slider("Height (px)", 200, 1024, params['height'])
+            params['colormap'] = st.selectbox("Color Map", plt.colormaps(), index=plt.colormaps().index(params['colormap']))
+            params['color_invert'] = st.checkbox("Invert Colors", value=params['color_invert'])
+            params['show_grid'] = st.checkbox("Show Grid Overlay (Future Feature)", value=params['show_grid'], disabled=True) # Disabled for now
 
-    if st.button("Generate Fractal Image") or (params.get('auto_generate', False) and st.session_state.rerun_flag):
+        # Auto-generate checkbox
+        params['auto_generate'] = st.checkbox("Auto-generate fractal on parameter change", value=params['auto_generate'])
+
+        submitted = st.form_submit_button("Generate Fractal Image Now")
+
+    # Display fractal if submitted or auto-generate is on
+    if submitted or params['auto_generate']:
         with st.spinner("Generating fractal..."):
             img_array = generate_fractal(params)
             if img_array is not None:
-                st.image(img_array, use_column_width=True)
-                if params['show_grid']:
-                    st.markdown("<small>Grid overlay feature coming soon.</small>", unsafe_allow_html=True)
+                st.image(img_array, use_container_width=True)
 
-with tabs[1]:
+with tabs[1]: # Audio Synthesis
     audio_ui()
 
-with tabs[2]:
+with tabs[2]: # Chat
     chat_ui()
 
-with tabs[3]:
+with tabs[3]: # Animation
     animation_ui()
 
-with tabs[4]:
+with tabs[4]: # Gallery
     gallery_ui()
 
-with tabs[5]:
+with tabs[5]: # Settings
     settings_ui()
 
-with tabs[6]:
+with tabs[6]: # Export
     export_ui()
 
-# --- Handle rerun flag ---
-if st.session_state.get('rerun_flag', False):
-    st.session_state.rerun_flag = False
+# --- Global rerun management ---
+# Only rerun if explicitly triggered by an action that needs a full refresh
+if st.session_state.get('rerun_triggered', False):
+    st.session_state.rerun_triggered = False # Reset the flag
     st.experimental_rerun()
