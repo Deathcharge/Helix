@@ -38,10 +38,22 @@ except ValueError as e:
     openai.api_key = None
 
 class SamsaraHelixContext:
+    class SamsaraHelixContext:
     def __init__(self):
         self.state = DEFAULT_STATE.copy()
-        self.history: List[str] = []
+        self.history = []
         self.session_start = time.time()
+        self.active_sessions = 0
+        self.max_sessions = 5  # Limit concurrent sessions
+
+    def can_start_new_session(self):
+        if self.active_sessions >= self.max_sessions:
+            return False, f"⚠️ Blackbox is handling too many sessions ({self.active_sessions}/{self.max_sessions}). Please wait."
+        self.active_sessions += 1
+        return True, "Session started."
+
+    def end_session(self):
+        self.active_sessions = max(0, self.active_sessions - 1)
 
     def update_state(self, updates: Dict[str, float]) -> None:
         self.state.update(updates)
