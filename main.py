@@ -36,10 +36,10 @@ from ucf_protocol import format_ucf_message
 st.set_page_config(page_title="🕉️ Samsara Helix v∞", layout="wide")
 
 # -------------------------------
-# Firebase Setup (Forum)
+# Firebase Setup
 # -------------------------------
-FIREBASE_KEY_PATH = "firebase_key.json"  # Add Firebase service key to repo root
-FIREBASE_DB_URL = "https://<YOUR-FIREBASE-URL>.firebaseio.com/"
+FIREBASE_KEY_PATH = "project-helix-f77a1-firebase-adminsdk-fbsvc-4488d33169.json"
+FIREBASE_DB_URL = "https://project-helix-f77a1-default-rtdb.firebaseio.com/"
 
 if not firebase_admin._apps:
     try:
@@ -138,7 +138,6 @@ def generate_fractal(params):
         center_real = params['center_real']
         center_imag = params['center_imag']
         max_iter = params['iterations']
-        fractal_type = params.get('fractal_type', 'mandelbrot')
         colormap = params.get('colormap', 'hot')
         color_invert = params.get('color_invert', False)
 
@@ -255,6 +254,7 @@ def forum_ui():
 # -------------------------------
 tabs = st.tabs(["Fractal Studio", "Audio Synthesis", "Chat", "Animation", "Gallery", "Forum", "Settings", "Export"])
 
+# Fractal Tab
 with tabs[0]:
     st.subheader("Fractal Studio")
     params = st.session_state.fractal_params
@@ -274,6 +274,7 @@ with tabs[0]:
         if img_array is not None:
             st.image(img_array, use_container_width=True)
 
+# Audio Tab
 with tabs[1]:
     st.subheader("Audio Synthesis")
     audio_buffer = generate_audio(st.session_state.audio_params)
@@ -281,5 +282,6 @@ with tabs[1]:
         if audio_buffer:
             st.audio(audio_buffer, format='audio/wav')
 
+# Forum Tab
 with tabs[5]:
     forum_ui()
