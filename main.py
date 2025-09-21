@@ -1,7 +1,8 @@
+# main.py - Complete Helix Integration with Forum
+
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
-import re
 import io
 import time
 from PIL import Image
@@ -36,7 +37,7 @@ from ucf_protocol import format_ucf_message
 st.set_page_config(page_title="🕉️ Samsara Helix v∞", layout="wide")
 
 # -------------------------------
-# Firebase Setup
+# Firebase Setup (Forum)
 # -------------------------------
 FIREBASE_KEY_PATH = "project-helix-f77a1-firebase-adminsdk-fbsvc-4488d33169.json"
 FIREBASE_DB_URL = "https://project-helix-f77a1-default-rtdb.firebaseio.com/"
@@ -138,6 +139,7 @@ def generate_fractal(params):
         center_real = params['center_real']
         center_imag = params['center_imag']
         max_iter = params['iterations']
+        fractal_type = params.get('fractal_type', 'mandelbrot')
         colormap = params.get('colormap', 'hot')
         color_invert = params.get('color_invert', False)
 
@@ -252,9 +254,8 @@ def forum_ui():
 # -------------------------------
 # Tabs
 # -------------------------------
-tabs = st.tabs(["Fractal Studio", "Audio Synthesis", "Chat", "Animation", "Gallery", "Forum", "Settings", "Export"])
+tabs = st.tabs(["Fractal Studio", "Audio Synthesis", "Forum", "Settings"])
 
-# Fractal Tab
 with tabs[0]:
     st.subheader("Fractal Studio")
     params = st.session_state.fractal_params
@@ -274,7 +275,6 @@ with tabs[0]:
         if img_array is not None:
             st.image(img_array, use_container_width=True)
 
-# Audio Tab
 with tabs[1]:
     st.subheader("Audio Synthesis")
     audio_buffer = generate_audio(st.session_state.audio_params)
@@ -282,6 +282,12 @@ with tabs[1]:
         if audio_buffer:
             st.audio(audio_buffer, format='audio/wav')
 
-# Forum Tab
-with tabs[5]:
+with tabs[2]:
     forum_ui()
+
+with tabs[3]:
+    st.subheader("Settings")
+    settings = st.session_state.settings
+    settings['theme'] = st.selectbox("Theme", ['light', 'dark'], index=['light', 'dark'].index(settings['theme']))
+    settings['language'] = st.selectbox("Language", ['English', 'Sanskrit', 'Other'], index=['English', 'Sanskrit', 'Other'].index(settings['language']))
+    settings['auto_generate_fractal'] = st.checkbox("Auto-generate fractal on parameter change", value=settings['auto_generate_fractal'])
