@@ -9,9 +9,25 @@ from PIL import Image
 import firebase_admin
 from firebase_admin import credentials, db
 
-# ==============================
+# ------------------------------------
+# Firebase Setup - Secure Secrets
+# ------------------------------------
+FIREBASE_DB_URL = "https://project-helix-f77a1-default-rtdb.firebaseio.com/"
+
+try:
+    # Load Firebase key from Streamlit secrets
+    firebase_key_dict = json.loads(st.secrets["firebase_service_key"])
+    if not firebase_admin._apps:
+        cred = credentials.Certificate(firebase_key_dict)
+        firebase_admin.initialize_app(cred, {"databaseURL": FIREBASE_DB_URL})
+except KeyError:
+    st.error("❌ Firebase key not found in Streamlit secrets. Go to Settings → Secrets and add 'firebase_service_key'.")
+except Exception as e:
+    st.error(f"⚠️ Firebase initialization error: {e}")
+
+# ------------------------------------
 # Optional Imports
-# ==============================
+# ------------------------------------
 try:
     import soundfile as sf
 except ImportError:
@@ -22,36 +38,23 @@ try:
     import imageio
 except ImportError:
     imageio = None
-    st.warning("`imageio` not found. Animation disabled. Install with `pip install imageio`.")
+    st.warning("`imageio` not found. Animation generation disabled. Install with `pip install imageio`.")
 
-# ==============================
+# ------------------------------------
 # Custom Modules
-# ==============================
+# ------------------------------------
 from context_manager import SamsaraHelixContext
 from agents import AGENTS
 from ucf_protocol import format_ucf_message
 
-# ==============================
+# ------------------------------------
 # Page Config
-# ==============================
+# ------------------------------------
 st.set_page_config(page_title="🕉️ Samsara Helix v∞", layout="wide")
 
-# ==============================
-# Firebase Initialization
-# ==============================
-FIREBASE_KEY_PATH = "project-helix-f77a1-firebase-adminsdk-fbsvc-4488d33169.json"
-FIREBASE_DB_URL = "https://project-helix-f77a1-default-rtdb.firebaseio.com/"
-
-if not firebase_admin._apps:
-    try:
-        cred = credentials.Certificate(FIREBASE_KEY_PATH)
-        firebase_admin.initialize_app(cred, {"databaseURL": FIREBASE_DB_URL})
-    except Exception as e:
-        st.error(f"⚠️ Firebase initialization error: {e}")
-
-# ==============================
+# ------------------------------------
 # Session State Initialization
-# ==============================
+# ------------------------------------
 def init_session_state():
     defaults = {
         'chat_messages': [],
@@ -101,9 +104,9 @@ init_session_state()
 if 'samsara_helix_context' not in st.session_state:
     st.session_state.samsara_helix_context = SamsaraHelixContext()
 
-# ==============================
+# ------------------------------------
 # Firebase Forum Functions
-# ==============================
+# ------------------------------------
 def create_thread(title, content, user):
     ref = db.reference("threads")
     new_thread = ref.push()
@@ -129,9 +132,9 @@ def get_threads():
     threads = ref.get()
     return threads or {}
 
-# ==============================
+# ------------------------------------
 # Fractal Generation
-# ==============================
+# ------------------------------------
 def generate_fractal(params):
     try:
         width, height = params['width'], params['height']
@@ -167,14 +170,15 @@ def generate_fractal(params):
             norm = 1 - norm
         cmap = plt.get_cmap(colormap)
         colored = cmap(norm)
-        return (colored[:, :, :3] * 255).astype(np.uint8)
+        img_array = (colored[:, :, :3] * 255).astype(np.uint8)
+        return img_array
     except Exception as e:
         st.error(f"Error generating fractal: {e}")
         return None
 
-# ==============================
+# ------------------------------------
 # Audio Generation
-# ==============================
+# ------------------------------------
 def generate_audio(params):
     if sf is None:
         st.error("`soundfile` is required for audio synthesis.")
@@ -205,12 +209,12 @@ def generate_audio(params):
         st.error(f"Error generating audio: {e}")
         return None
 
-# ==============================
+# ------------------------------------
 # Animation Generation
-# ==============================
+# ------------------------------------
 def generate_animation(params):
     if imageio is None:
-        st.error("`imageio` is required for animation generation.")
+        st.error("`imageio` package is required for animations.")
         return None
     try:
         frames = []
@@ -230,40 +234,9 @@ def generate_animation(params):
         st.error(f"Error generating animation: {e}")
         return None
 
-# ==============================
-# Chat UI
-# ==============================
-def chat_ui():
-    st.header("🕉️ Samsara Helix Chat")
-
-    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-    for msg in st.session_state.chat_messages:
-        role_class = "user-msg" if msg["role"] == "user" else "assistant-msg"
-        st.markdown(f'<div class="{role_class}">{msg["content"]}</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    def send_message_callback():
-        user_input = st.session_state.chat_input_widget
-        if not user_input:
-            return
-        st.session_state.chat_messages.append({"role": "user", "content": user_input})
-        st.session_state.chat_input_value = ""
-        with st.spinner("Thinking..."):
-            ai_response = st.session_state.samsara_helix_context.generate_ucf_context(user_input, user_input)
-            st.session_state.chat_messages.append({"role": "assistant", "content": ai_response})
-        st.session_state.rerun_triggered = True
-
-    st.text_input(
-        "Type your message here...",
-        key="chat_input_widget",
-        value=st.session_state.chat_input_value,
-        on_change=send_message_callback
-    )
-    st.button("Send", on_click=send_message_callback)
-
-# ==============================
+# ------------------------------------
 # Forum UI
-# ==============================
+# ------------------------------------
 def forum_ui():
     st.header("Community Forum 🧵")
     username = st.text_input("Your Username")
@@ -305,73 +278,64 @@ def forum_ui():
                     st.success("Reply added!")
                     st.rerun()
 
-# ==============================
-# Tabs
-# ==============================
-tabs = st.tabs([
-    "Fractal Studio", "Audio Synthesis", "Chat",
-    "Animation", "Gallery", "Forum", "Settings", "Export"
-])
+# ------------------------------------
+# Tabs Layout
+# ------------------------------------
+tabs = st.tabs(["Fractal Studio", "Audio Synthesis", "Chat", "Animation", "Gallery", "Forum", "Settings", "Export"])
 
+# Fractal Studio
 with tabs[0]:
     st.subheader("Fractal Studio")
     params = st.session_state.fractal_params
-    submitted = st.form("fractal_form").form_submit_button("Generate")
+    auto_generate_changed = st.checkbox("Auto-generate fractal", value=params['auto_generate'])
+    if auto_generate_changed != params['auto_generate']:
+        params['auto_generate'] = auto_generate_changed
+        st.session_state.rerun_triggered = True
+
+    with st.form("fractal_form"):
+        params['zoom'] = st.slider("Zoom", 0.0001, 2000.0, params['zoom'], step=0.001)
+        params['iterations'] = st.slider("Iterations", 10, 1000, params['iterations'])
+        params['colormap'] = st.selectbox("Color Map", plt.colormaps(), index=plt.colormaps().index(params['colormap']))
+        submitted = st.form_submit_button("Generate")
+
     if submitted or params['auto_generate']:
         img_array = generate_fractal(params)
         if img_array is not None:
             st.image(img_array, use_container_width=True)
 
+# Audio Synthesis
 with tabs[1]:
     st.subheader("Audio Synthesis")
-    audio_buffer = generate_audio(st.session_state.audio_params)
+    params = st.session_state.audio_params
     if st.button("Generate Audio"):
+        audio_buffer = generate_audio(params)
         if audio_buffer:
             st.audio(audio_buffer, format='audio/wav')
 
+# Chat Tab
 with tabs[2]:
-    chat_ui()
+    st.header("🕉️ Samsara Helix Chat")
+    st.text_input("Type your message here...", key="chat_input_widget")
+    if st.button("Send"):
+        st.write("⚠️ Chat functionality coming soon!")
 
+# Animation
 with tabs[3]:
-    st.subheader("Animation Studio")
+    st.subheader("Fractal Animation")
     if st.button("Generate Animation"):
         gif_buffer = generate_animation(st.session_state.animation_params)
         if gif_buffer:
-            gif_buffer.seek(0)
-            st.image(gif_buffer.getvalue(), format="GIF", use_container_width=True)
+            st.image(gif_buffer.getvalue(), format="GIF")
 
+# Gallery
 with tabs[4]:
     st.subheader("Gallery")
-    if st.button("Add Current Fractal to Gallery"):
-        img_array = generate_fractal(st.session_state.fractal_params)
-        if img_array is not None:
-            st.session_state.gallery_images.append(img_array)
-            st.success("Added to gallery!")
-
-    if st.session_state.gallery_images:
+    if len(st.session_state.gallery_images) == 0:
+        st.info("No images yet.")
+    else:
         for idx, img in enumerate(st.session_state.gallery_images):
-            st.image(img, caption=f"Gallery Image {idx+1}", use_container_width=True)
+            st.image(img, caption=f"Gallery Image {idx+1}")
 
+# Forum
 with tabs[5]:
     forum_ui()
-
-with tabs[6]:
-    st.subheader("Settings")
-    settings = st.session_state.settings
-    settings['theme'] = st.selectbox("Theme", ['light', 'dark'], index=['light', 'dark'].index(settings['theme']))
-    settings['language'] = st.selectbox("Language", ['English', 'Sanskrit', 'Other'],
-                                        index=['English', 'Sanskrit', 'Other'].index(settings['language']))
-
-with tabs[7]:
-    st.subheader("Export")
-    if st.session_state.gallery_images:
-        img = Image.fromarray(st.session_state.gallery_images[-1])
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        byte_im = buf.getvalue()
-        st.download_button(
-            label="Download Last Image as PNG",
-            data=byte_im,
-            file_name="samsara_helix_fractal.png",
-            mime="image/png"
-        )
