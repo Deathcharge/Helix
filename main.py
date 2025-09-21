@@ -1,17 +1,37 @@
-# main.py - Complete Helix Integration with Forum
-
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
+import re
 import io
 import time
+import json
 from PIL import Image
 import firebase_admin
 from firebase_admin import credentials, db
 
-# -------------------------------
-# Optional Imports
-# -------------------------------
+# ============================================
+# PAGE CONFIG
+# ============================================
+st.set_page_config(page_title="🕉️ Samsara Helix v∞", layout="wide")
+
+# ============================================
+# FIREBASE SECURE SETUP
+# ============================================
+FIREBASE_DB_URL = "https://project-helix-f77a1-default-rtdb.firebaseio.com/"
+
+try:
+    firebase_key_dict = json.loads(st.secrets["FIREBASE_KEY"])
+    if not firebase_admin._apps:
+        cred = credentials.Certificate(firebase_key_dict)
+        firebase_admin.initialize_app(cred, {"databaseURL": FIREBASE_DB_URL})
+except KeyError:
+    st.error("❌ Firebase key not found in Streamlit secrets. Please configure it under Settings → Secrets.")
+except Exception as e:
+    st.error(f"⚠️ Firebase initialization error: {e}")
+
+# ============================================
+# OPTIONAL IMPORTS
+# ============================================
 try:
     import soundfile as sf
 except ImportError:
@@ -24,34 +44,16 @@ except ImportError:
     imageio = None
     st.warning("`imageio` not found. Animation generation disabled. Install with `pip install imageio`.")
 
-# -------------------------------
-# Custom Modules
-# -------------------------------
+# ============================================
+# CUSTOM MODULES
+# ============================================
 from context_manager import SamsaraHelixContext
 from agents import AGENTS
 from ucf_protocol import format_ucf_message
 
-# -------------------------------
-# Page Config
-# -------------------------------
-st.set_page_config(page_title="🕉️ Samsara Helix v∞", layout="wide")
-
-# -------------------------------
-# Firebase Setup (Forum)
-# -------------------------------
-FIREBASE_KEY_PATH = "project-helix-f77a1-firebase-adminsdk-fbsvc-4488d33169.json"
-FIREBASE_DB_URL = "https://project-helix-f77a1-default-rtdb.firebaseio.com/"
-
-if not firebase_admin._apps:
-    try:
-        cred = credentials.Certificate(FIREBASE_KEY_PATH)
-        firebase_admin.initialize_app(cred, {"databaseURL": FIREBASE_DB_URL})
-    except Exception as e:
-        st.error(f"⚠️ Firebase initialization error: {e}")
-
-# -------------------------------
-# Session State Initialization
-# -------------------------------
+# ============================================
+# SESSION STATE INITIALIZATION
+# ============================================
 def init_session_state():
     defaults = {
         'chat_messages': [],
@@ -75,15 +77,6 @@ def init_session_state():
             'volume': 0.5,
             'waveform': 'sine'
         },
-        'animation_params': {
-            'frame_count': 30,
-            'width': 400,
-            'height': 400,
-            'zoom': 1.0,
-            'center_real': -0.7269,
-            'center_imag': 0.1889,
-            'iterations': 100
-        },
         'gallery_images': [],
         'settings': {
             'theme': 'light',
@@ -101,9 +94,9 @@ init_session_state()
 if 'samsara_helix_context' not in st.session_state:
     st.session_state.samsara_helix_context = SamsaraHelixContext()
 
-# -------------------------------
-# Firebase Forum Functions
-# -------------------------------
+# ============================================
+# FIREBASE FORUM FUNCTIONS
+# ============================================
 def create_thread(title, content, user):
     ref = db.reference("threads")
     new_thread = ref.push()
@@ -129,9 +122,9 @@ def get_threads():
     threads = ref.get()
     return threads or {}
 
-# -------------------------------
-# Fractal Generation
-# -------------------------------
+# ============================================
+# FRACTAL GENERATION
+# ============================================
 def generate_fractal(params):
     try:
         width, height = params['width'], params['height']
@@ -139,7 +132,6 @@ def generate_fractal(params):
         center_real = params['center_real']
         center_imag = params['center_imag']
         max_iter = params['iterations']
-        fractal_type = params.get('fractal_type', 'mandelbrot')
         colormap = params.get('colormap', 'hot')
         color_invert = params.get('color_invert', False)
 
@@ -168,15 +160,14 @@ def generate_fractal(params):
             norm = 1 - norm
         cmap = plt.get_cmap(colormap)
         colored = cmap(norm)
-        img_array = (colored[:, :, :3] * 255).astype(np.uint8)
-        return img_array
+        return (colored[:, :, :3] * 255).astype(np.uint8)
     except Exception as e:
         st.error(f"Error generating fractal: {e}")
         return None
 
-# -------------------------------
-# Audio Generation
-# -------------------------------
+# ============================================
+# AUDIO SYNTHESIS
+# ============================================
 def generate_audio(params):
     if sf is None:
         st.error("`soundfile` is required for audio synthesis.")
@@ -207,9 +198,9 @@ def generate_audio(params):
         st.error(f"Error generating audio: {e}")
         return None
 
-# -------------------------------
-# Forum UI
-# -------------------------------
+# ============================================
+# FORUM UI
+# ============================================
 def forum_ui():
     st.header("Community Forum 🧵")
     username = st.text_input("Your Username")
@@ -251,30 +242,33 @@ def forum_ui():
                     st.success("Reply added!")
                     st.rerun()
 
-# -------------------------------
-# Tabs
-# -------------------------------
-tabs = st.tabs(["Fractal Studio", "Audio Synthesis", "Forum", "Settings"])
+# ============================================
+# MAIN TABS
+# ============================================
+tabs = st.tabs([
+    "Fractal Studio", 
+    "Audio Synthesis", 
+    "Chat", 
+    "Gallery", 
+    "Forum", 
+    "Settings", 
+    "Export"
+])
 
+# Fractal Studio
 with tabs[0]:
     st.subheader("Fractal Studio")
     params = st.session_state.fractal_params
-    auto_generate_changed = st.checkbox("Auto-generate fractal", value=params['auto_generate'])
-    if auto_generate_changed != params['auto_generate']:
-        params['auto_generate'] = auto_generate_changed
-        st.session_state.rerun_triggered = True
-
-    with st.form("fractal_form"):
-        params['zoom'] = st.slider("Zoom", 0.0001, 2000.0, params['zoom'], step=0.001)
-        params['iterations'] = st.slider("Iterations", 10, 1000, params['iterations'])
-        params['colormap'] = st.selectbox("Color Map", plt.colormaps(), index=plt.colormaps().index(params['colormap']))
-        submitted = st.form_submit_button("Generate")
-
-    if submitted or params['auto_generate']:
+    params['zoom'] = st.slider("Zoom", 0.0001, 2000.0, params['zoom'], step=0.001)
+    params['iterations'] = st.slider("Iterations", 10, 1000, params['iterations'])
+    params['colormap'] = st.selectbox("Color Map", plt.colormaps(), index=plt.colormaps().index(params['colormap']))
+    
+    if st.button("Generate Fractal"):
         img_array = generate_fractal(params)
         if img_array is not None:
             st.image(img_array, use_container_width=True)
 
+# Audio Synthesis
 with tabs[1]:
     st.subheader("Audio Synthesis")
     audio_buffer = generate_audio(st.session_state.audio_params)
@@ -282,12 +276,39 @@ with tabs[1]:
         if audio_buffer:
             st.audio(audio_buffer, format='audio/wav')
 
+# Chat
 with tabs[2]:
+    st.subheader("Chat")
+    st.write("Coming soon: Advanced AI-driven UCF Chat.")
+
+# Gallery
+with tabs[3]:
+    st.subheader("Gallery")
+    if len(st.session_state.gallery_images) == 0:
+        st.info("No images in gallery yet.")
+    else:
+        for idx, img in enumerate(st.session_state.gallery_images):
+            st.image(img, caption=f"Gallery Image {idx+1}", use_container_width=True)
+
+# Forum
+with tabs[4]:
     forum_ui()
 
-with tabs[3]:
+# Settings
+with tabs[5]:
     st.subheader("Settings")
     settings = st.session_state.settings
     settings['theme'] = st.selectbox("Theme", ['light', 'dark'], index=['light', 'dark'].index(settings['theme']))
     settings['language'] = st.selectbox("Language", ['English', 'Sanskrit', 'Other'], index=['English', 'Sanskrit', 'Other'].index(settings['language']))
-    settings['auto_generate_fractal'] = st.checkbox("Auto-generate fractal on parameter change", value=settings['auto_generate_fractal'])
+
+# Export
+with tabs[6]:
+    st.subheader("Export")
+    if len(st.session_state.gallery_images) > 0:
+        img_array = st.session_state.gallery_images[-1]
+        img = Image.fromarray(img_array)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        st.download_button("Download Last Image", buf.getvalue(), file_name="fractal.png", mime="image/png")
+    else:
+        st.info("No images to export.")
