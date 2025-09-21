@@ -1,72 +1,79 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
-import re
 import io
+import re
 import time
 import json
 from PIL import Image
 import firebase_admin
 from firebase_admin import credentials, db
+import openai
 
-# ==============================
-# CONFIGURATION
-# ==============================
-st.set_page_config(page_title="🕉️ Samsara Helix v∞ Limitless", layout="wide")
+# -------------------------------
+# Page Config
+# -------------------------------
+st.set_page_config(page_title="🕉️ Samsara Helix v∞", layout="wide")
 
-FIREBASE_DB_URL = "https://project-helix-f77a1-default-rtdb.firebaseio.com/"
-
-# Load Firebase key from secrets
+# -------------------------------
+# Load Secrets
+# -------------------------------
 try:
-    firebase_key_dict = json.loads(st.secrets["FIREBASE_KEY"])
-    if not firebase_admin._apps:
-        cred = credentials.Certificate(firebase_key_dict)
-        firebase_admin.initialize_app(cred, {"databaseURL": FIREBASE_DB_URL})
+    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+    openai.api_key = OPENAI_API_KEY
 except KeyError:
-    st.error("❌ Firebase key not found in Streamlit secrets.")
-except Exception as e:
-    st.error(f"⚠️ Firebase initialization error: {e}")
+    st.error("❌ OpenAI API key missing. Add OPENAI_API_KEY to Streamlit secrets.")
 
-# ==============================
-# SESSION STATE INITIALIZATION
-# ==============================
+try:
+    FIREBASE_KEY = json.loads(st.secrets["FIREBASE_KEY"])
+    FIREBASE_DB_URL = "https://project-helix-f77a1-default-rtdb.firebaseio.com/"
+except KeyError:
+    st.error("❌ Firebase key missing. Add FIREBASE_KEY to Streamlit secrets.")
+    FIREBASE_KEY = None
+
+# -------------------------------
+# Firebase Initialization
+# -------------------------------
+if FIREBASE_KEY and not firebase_admin._apps:
+    try:
+        cred = credentials.Certificate(FIREBASE_KEY)
+        firebase_admin.initialize_app(cred, {"databaseURL": FIREBASE_DB_URL})
+    except Exception as e:
+        st.error(f"⚠️ Firebase initialization error: {e}")
+
+# -------------------------------
+# Initialize Session State
+# -------------------------------
 def init_session_state():
     defaults = {
-        "username": "",
         "chat_messages": [],
-        "chat_input": "",
-        "rerun_flag": False,
         "fractal_params": {
             "zoom": 1.0,
             "center_real": -0.7269,
             "center_imag": 0.1889,
-            "iterations": 100,
-            "width": 600,
-            "height": 450,
-            "colormap": "hot"
+            "iterations": 300,
+            "width": 800,
+            "height": 600,
+            "colormap": "hot",
+            "fractal_type": "mandelbrot",
+            "color_invert": False
         },
         "audio_params": {
             "base_frequency": 432,
             "duration_sec": 5,
             "volume": 0.5,
-            "waveform": "sine"
+            "waveform": "sine",
         },
         "animation_params": {
             "frame_count": 30,
-            "width": 400,
-            "height": 400,
-            "zoom": 1.0,
-            "center_real": -0.7269,
-            "center_imag": 0.1889,
-            "iterations": 100,
-            "colormap": "hot"
+            "zoom_step": 1.05,
         },
         "gallery_images": [],
         "settings": {
             "theme": "light",
             "language": "English",
-            "auto_generate_fractal": False
-        }
+            "auto_generate_fractal": False,
+        },
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -74,9 +81,9 @@ def init_session_state():
 
 init_session_state()
 
-# ==============================
-# FIREBASE FUNCTIONS
-# ==============================
+# -------------------------------
+# Firebase Forum Functions
+# -------------------------------
 def create_thread(title, content, user):
     ref = db.reference("threads")
     new_thread = ref.push()
@@ -102,201 +109,191 @@ def get_threads():
     threads = ref.get()
     return threads or {}
 
-# ==============================
-# FRACTAL GENERATION
-# ==============================
+# -------------------------------
+# Fractal Generation
+# -------------------------------
 def generate_fractal(params):
-    width, height = params["width"], params["height"]
-    zoom = params["zoom"]
-    center_real = params["center_real"]
-    center_imag = params["center_imag"]
-    max_iter = params["iterations"]
-    colormap = params["colormap"]
+    try:
+        w, h = params["width"], params["height"]
+        zoom = params["zoom"]
+        cr, ci = params["center_real"], params["center_imag"]
+        max_iter = params["iterations"]
+        fractal_type = params["fractal_type"]
+        cmap_name = params["colormap"]
 
-    scale = 3.0 / zoom
-    x_min = center_real - scale / 2
-    x_max = center_real + scale / 2
-    y_min = center_imag - scale / 2 * height / width
-    y_max = center_imag + scale / 2 * height / width
+        scale = 3.0 / zoom
+        x = np.linspace(cr - scale, cr + scale, w)
+        y = np.linspace(ci - scale, ci + scale, h)
+        X, Y = np.meshgrid(x, y)
+        C = X + 1j * Y
+        Z = np.zeros_like(C)
+        output = np.zeros(C.shape, dtype=int)
 
-    x = np.linspace(x_min, x_max, width)
-    y = np.linspace(y_min, y_max, height)
-    X, Y = np.meshgrid(x, y)
-    C = X + 1j * Y
-    Z = np.zeros_like(C)
-    escape_time = np.zeros(C.shape, dtype=float)
+        for i in range(max_iter):
+            mask = np.abs(Z) <= 2
+            Z[mask] = Z[mask] ** 2 + C[mask]
+            output[mask & (np.abs(Z) > 2)] = i
 
-    for i in range(max_iter):
-        mask = np.abs(Z) <= 2
-        Z[mask] = Z[mask] ** 2 + C[mask]
-        escaped = (np.abs(Z) > 2) & (escape_time == 0)
-        escape_time[escaped] = i + 1 - np.log2(np.log2(np.abs(Z[escaped])))
+        norm = output / max_iter
+        if params["color_invert"]:
+            norm = 1 - norm
+        cmap = plt.get_cmap(cmap_name)
+        img = (cmap(norm)[:, :, :3] * 255).astype(np.uint8)
+        return img
+    except Exception as e:
+        st.error(f"Fractal generation error: {e}")
+        return None
 
-    escape_time[escape_time == 0] = max_iter
-    norm = (escape_time - escape_time.min()) / (escape_time.max() - escape_time.min())
-    cmap = plt.get_cmap(colormap)
-    colored = cmap(norm)
-    return (colored[:, :, :3] * 255).astype(np.uint8)
-
-# ==============================
-# AUDIO SYNTHESIS
-# ==============================
+# -------------------------------
+# Audio Generation
+# -------------------------------
 def generate_audio(params):
-    import soundfile as sf
     fs = 44100
     t = np.linspace(0, params["duration_sec"], int(fs * params["duration_sec"]), False)
     freq = params["base_frequency"]
-    waveform = params["waveform"]
 
-    if waveform == "sine":
+    if params["waveform"] == "sine":
         audio = np.sin(2 * np.pi * freq * t)
-    elif waveform == "square":
+    elif params["waveform"] == "square":
         audio = np.sign(np.sin(2 * np.pi * freq * t))
-    elif waveform == "sawtooth":
+    elif params["waveform"] == "sawtooth":
         audio = 2 * (t * freq - np.floor(0.5 + t * freq))
     else:
         audio = np.sin(2 * np.pi * freq * t)
 
     audio *= params["volume"]
-    audio = (audio * 32767).astype(np.int16)
-
     buffer = io.BytesIO()
+    import soundfile as sf
     sf.write(buffer, audio, fs, format="WAV")
     buffer.seek(0)
     return buffer
 
-# ==============================
-# ANIMATION GENERATION
-# ==============================
-def generate_animation(params):
-    import imageio
-    frames = []
-    cmap = plt.get_cmap(params["colormap"])
-    for i in range(params["frame_count"]):
-        zoom = params["zoom"] * (1 + i / params["frame_count"])
-        temp_params = params.copy()
-        temp_params["zoom"] = zoom
-        img_array = generate_fractal(temp_params)
-        frames.append(img_array)
-    buffer = io.BytesIO()
-    imageio.mimsave(buffer, frames, format="GIF", duration=0.1)
-    buffer.seek(0)
-    return buffer
+# -------------------------------
+# Helix Chat
+# -------------------------------
+def helix_response(user_input):
+    try:
+        messages = [
+            {"role": "system", "content": "You are Helix, a multi-agent AI collective with rich contextual awareness."},
+            {"role": "user", "content": user_input},
+        ]
+        resp = openai.ChatCompletion.create(model="gpt-4o-mini", messages=messages, max_tokens=300)
+        return resp.choices[0].message["content"]
+    except Exception as e:
+        return f"[Error generating response: {e}]"
 
-# ==============================
-# CHAT UI
-# ==============================
-def chat_ui():
+# -------------------------------
+# Forum UI
+# -------------------------------
+def forum_ui():
+    st.header("Community Forum 🧵")
+    username = st.text_input("Your Username")
+    title = st.text_input("Thread Title")
+    content = st.text_area("Thread Content")
+
+    if st.button("Post Thread"):
+        if username and title and content:
+            create_thread(title, content, username)
+            st.success("Thread posted!")
+            st.experimental_rerun()
+        else:
+            st.error("All fields required.")
+
+    st.subheader("Recent Threads")
+    threads = get_threads()
+    if threads:
+        for thread_id, data in sorted(threads.items(), key=lambda x: x[1]["timestamp"], reverse=True):
+            st.markdown(f"### {data['title']} (by {data['user']})")
+            st.write(data["content"])
+            st.caption(time.ctime(data["timestamp"]))
+
+            if "replies" in data:
+                for r_id, reply in data["replies"].items():
+                    st.write(f"- **{reply['user']}**: {reply['content']}")
+
+            reply_text = st.text_input(f"Reply to {thread_id}", key=f"reply-{thread_id}")
+            if st.button(f"Send-{thread_id}"):
+                if reply_text and username:
+                    add_reply(thread_id, reply_text, username)
+                    st.success("Reply added!")
+                    st.experimental_rerun()
+
+# -------------------------------
+# Settings UI
+# -------------------------------
+def settings_ui():
+    st.header("⚙️ Settings")
+    theme = st.selectbox("Theme", ["light", "dark"], index=["light", "dark"].index(st.session_state.settings["theme"]))
+    st.session_state.settings["theme"] = theme
+    st.session_state.settings["language"] = st.selectbox("Language", ["English", "Sanskrit", "Other"])
+
+# -------------------------------
+# Tabs
+# -------------------------------
+tabs = st.tabs(["Fractal Studio", "Audio Synthesis", "Chat", "Gallery", "Forum", "Settings", "Export"])
+
+# --- Fractal Studio ---
+with tabs[0]:
+    st.subheader("Fractal Studio")
+    params = st.session_state.fractal_params
+    params["zoom"] = st.slider("Zoom", 0.001, 500.0, params["zoom"])
+    params["iterations"] = st.slider("Iterations", 10, 2000, params["iterations"])
+    params["colormap"] = st.selectbox("Color Map", plt.colormaps(), index=plt.colormaps().index(params["colormap"]))
+    if st.checkbox("Invert Colors", value=params["color_invert"]):
+        params["color_invert"] = True
+    if st.button("Generate Fractal"):
+        img = generate_fractal(params)
+        if img is not None:
+            st.image(img, caption="Generated Fractal", use_container_width=True)
+            st.session_state.gallery_images.append(img)
+
+# --- Audio Synthesis ---
+with tabs[1]:
+    st.subheader("Audio Synthesis")
+    params = st.session_state.audio_params
+    params["base_frequency"] = st.slider("Base Frequency (Hz)", 20, 2000, params["base_frequency"])
+    params["duration_sec"] = st.slider("Duration (sec)", 1, 20, params["duration_sec"])
+    params["volume"] = st.slider("Volume", 0.0, 1.0, params["volume"])
+    if st.button("Generate Audio"):
+        audio_buffer = generate_audio(params)
+        st.audio(audio_buffer, format="audio/wav")
+
+# --- Chat ---
+with tabs[2]:
     st.header("🕉️ Samsara Helix Chat")
-
+    user_input = st.text_input("Type your message")
+    if st.button("Send"):
+        if user_input:
+            st.session_state.chat_messages.append({"role": "user", "content": user_input})
+            response = helix_response(user_input)
+            st.session_state.chat_messages.append({"role": "assistant", "content": response})
     for msg in st.session_state.chat_messages:
         if msg["role"] == "user":
             st.markdown(f"**You:** {msg['content']}")
         else:
             st.markdown(f"**Helix:** {msg['content']}")
 
-    def send_chat_message():
-        user_msg = st.session_state.chat_input.strip()
-        if not user_msg:
-            return
-        st.session_state.chat_messages.append({"role": "user", "content": user_msg})
-        # Basic echo for now
-        st.session_state.chat_messages.append({"role": "assistant", "content": f"You said: {user_msg}"})
-        st.session_state.chat_input = ""
-
-    st.text_input("Type your message here...", key="chat_input")
-    st.button("Send", on_click=send_chat_message)
-
-# ==============================
-# FORUM UI
-# ==============================
-def forum_ui():
-    st.header("Community Forum 🧵")
-    st.session_state.username = st.text_input("Your Username", value=st.session_state.username)
-
-    st.subheader("Create New Thread")
-    title = st.text_input("Thread Title")
-    content = st.text_area("Thread Content")
-
-    if st.button("Post Thread"):
-        if title and content and st.session_state.username:
-            create_thread(title, content, st.session_state.username)
-            st.success("Thread posted successfully!")
-            st.rerun()
-        else:
-            st.error("Please provide title, content, and username.")
-
-    st.subheader("🔥 Recent Threads")
-    threads = get_threads()
-    if not threads:
-        st.info("No threads yet.")
-    else:
-        for thread_id, thread_data in sorted(threads.items(), key=lambda x: x[1]["timestamp"], reverse=True):
-            st.markdown(f"### {thread_data['title']} (by {thread_data['user']})")
-            st.write(thread_data['content'])
-            st.caption(f"Posted: {time.ctime(thread_data['timestamp'])}")
-
-            reply_content = st.text_input(f"Reply to thread {thread_id}", key=f"reply-{thread_id}")
-            if st.button(f"Reply-{thread_id}"):
-                if reply_content and st.session_state.username:
-                    add_reply(thread_id, reply_content, st.session_state.username)
-                    st.success("Reply added!")
-                    st.rerun()
-
-# ==============================
-# SETTINGS UI
-# ==============================
-def settings_ui():
-    st.header("⚙️ Settings")
-    st.session_state.settings["theme"] = st.selectbox("Theme", ["light", "dark"], index=0)
-    st.session_state.settings["language"] = st.selectbox("Language", ["English", "Sanskrit", "Other"])
-    st.session_state.settings["auto_generate_fractal"] = st.checkbox(
-        "Auto-generate fractals on parameter change", value=st.session_state.settings["auto_generate_fractal"]
-    )
-
-# ==============================
-# TAB LAYOUT
-# ==============================
-tabs = st.tabs(["Fractal Studio", "Audio Synthesis", "Chat", "Animation", "Gallery", "Forum", "Settings", "Export"])
-
-with tabs[0]:
-    st.subheader("Fractal Studio")
-    params = st.session_state.fractal_params
-    params["zoom"] = st.slider("Zoom", 0.0001, 2000.0, params["zoom"])
-    params["iterations"] = st.slider("Iterations", 10, 1000, params["iterations"])
-    params["colormap"] = st.selectbox("Color Map", plt.colormaps(), index=plt.colormaps().index(params["colormap"]))
-    if st.button("Generate Fractal"):
-        st.image(generate_fractal(params), use_container_width=True)
-
-with tabs[1]:
-    st.subheader("Audio Synthesis")
-    audio_buffer = generate_audio(st.session_state.audio_params)
-    if st.button("Generate Audio"):
-        st.audio(audio_buffer, format="audio/wav")
-
-with tabs[2]:
-    chat_ui()
-
+# --- Gallery ---
 with tabs[3]:
-    st.subheader("Animation")
-    anim_buffer = generate_animation(st.session_state.animation_params)
-    if st.button("Generate Animation"):
-        st.image(anim_buffer.getvalue(), format="GIF")
-
-with tabs[4]:
     st.subheader("Gallery")
-    if len(st.session_state.gallery_images) == 0:
-        st.info("No images in gallery yet.")
-    else:
-        for idx, img in enumerate(st.session_state.gallery_images):
-            st.image(img, caption=f"Gallery Image {idx+1}")
+    for i, img in enumerate(st.session_state.gallery_images):
+        st.image(img, caption=f"Fractal {i+1}", use_container_width=True)
 
-with tabs[5]:
+# --- Forum ---
+with tabs[4]:
     forum_ui()
 
-with tabs[6]:
+# --- Settings ---
+with tabs[5]:
     settings_ui()
 
-with tabs[7]:
+# --- Export ---
+with tabs[6]:
     st.subheader("Export")
-    st.info("Export options coming soon!")
+    if st.session_state.gallery_images:
+        img = Image.fromarray(st.session_state.gallery_images[-1])
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        st.download_button("Download Last Fractal", data=buf.getvalue(), file_name="fractal.png", mime="image/png")
+    else:
+        st.info("No fractals to export.")
