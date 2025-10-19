@@ -1,1 +1,4 @@
 echo ".env" >> .gitignore
+# In your Helix directory
+echo ".env" >> .gitignore
+echo "*.env" >> .gitignore
