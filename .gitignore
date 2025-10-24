@@ -1,4 +1,60 @@
-echo ".env" >> .gitignore
-# In your Helix directory
-echo ".env" >> .gitignore
-echo "*.env" >> .gitignore
+# Helix Collective v14.5 - Git Ignore
+
+# Environment variables (CRITICAL - NEVER COMMIT)
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# State files (runtime generated)
+Helix/state/*.json
+Helix/commands/*.json
+Shadow/manus_archive/*.log
+Shadow/manus_archive/*.json
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.bak
+*.old
