@@ -1,12 +1,12 @@
 {
-  "timestamp": "2025-10-20T23:15:33.552230",
+  "timestamp": "2025-11-05T18:51:37.586752",
   "results": {
     "Agents": true,
     "UCF State": true,
     "Heartbeat": true,
     "Ethics": true,
-    "Environment": true,
+    "Environment": false,
     "Discord Readiness": true
   },
-  "status": "\u2705 6/6 checks passed"
+  "status": "\u26a0\n5/6 checks passed"
 }
