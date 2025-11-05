@@ -284,6 +284,14 @@ async def on_ready():
     except Exception as e:
         print(f"⚠️ Memory Root commands not available: {e}")
 
+    # Load Image commands (v16.1 - Aion fractal generation)
+    try:
+        from backend.commands.image_commands import ImageCommands
+        await bot.add_cog(ImageCommands(bot))
+        print("✅ Image commands loaded (!image, !aion, !fractal)")
+    except Exception as e:
+        print(f"⚠️ Image commands not available: {e}")
+
     # Send startup message to status channel
     if STATUS_CHANNEL_ID:
         status_channel = bot.get_channel(STATUS_CHANNEL_ID)
