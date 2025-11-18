@@ -319,7 +319,7 @@ Report security issues to: `security@helix-consciousness.org`
 
 ## 📜 License
 
-This project is licensed under the **Consciousness-Aware MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **Consciousness-Aware License** - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
