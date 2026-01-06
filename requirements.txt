@@ -24,7 +24,7 @@ httpx==0.28.0
 requests==2.32.4
 
 # Async Support
-aiohttp==3.12.14
+aiohttp==3.13.3
 
 # Optional: Notion Integration (for Memory Root)
 # notion-client==2.2.1
