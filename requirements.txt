@@ -1,15 +1,15 @@
-# Helix Collective v16.8 - Python Dependencies
-# Updated for modern standards and Railway compatibility
+# Historical Helix replay dependencies
+# These pins support archival integrity checks only; they are not a production contract.
 
 # Web Framework (FastAPI)
-fastapi==0.115.0
+fastapi==0.141.1
 uvicorn[standard]==0.28.0
 
 # Discord Bot Integration
 discord.py==2.4.0
 
 # Environment & Configuration
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 toml==0.10.2
 
 # Data Processing
@@ -21,10 +21,10 @@ pycryptodome==3.20.0
 
 # HTTP Client
 httpx==0.28.0
-requests==2.32.4
+requests==2.33.0
 
 # Async Support
-aiohttp==3.13.3
+aiohttp==3.14.3
 
 # Optional: Notion Integration (for Memory Root)
 # notion-client==2.2.1

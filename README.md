@@ -1,93 +1,42 @@
-# Helix
+# Helix — historical source archive
 
-Main Helix repository
+This repository preserves an early Helix aggregate for provenance and research. It is
+superseded by the maintained Samsarix repositories and is **not a production-ready,
+supported, or deployable product**.
 
-## 🎯 Overview
+## Safety boundary
 
-This repository is part of the [Helix Collective](https://github.com/Deathcharge/helix-platform), a comprehensive ecosystem for building intelligent, multi-agent systems with consciousness frameworks and advanced LLM integration.
+- Do not deploy the included FastAPI, Discord, Railway, Streamlit, or agent entry
+  points as maintained Samsarix services.
+- Do not use the historical environment, deployment, or architecture documents as
+  current operational guidance.
+- `requirements.txt` exists only to make security review and historical replay
+  reproducible. A successful install or integrity check does not create a support
+  commitment.
+- Never place live credentials in this repository. Treat every historical integration
+  surface as untrusted until it is reviewed against a maintained Samsarix component.
 
-## 🚀 Quick Start
+## Maintained successors
 
-### Installation
+Current work lives in focused repositories under the
+[Deathcharge organization](https://github.com/Deathcharge), including
+[`samsarix-core`](https://github.com/Deathcharge/samsarix-core) and
+[`samsarix-agent-framework`](https://github.com/Deathcharge/samsarix-agent-framework).
+The former Helix branding is retained here because changing historical identity would
+make provenance harder to follow.
 
-\`\`\`bash
-git clone https://github.com/Deathcharge/Helix.git
-cd Helix
-pip install -r requirements.txt
-\`\`\`
+## What is preserved
 
-### Basic Usage
+The tree contains competing application entry points, agent experiments, protocol
+prototypes, deployment notes, and tests from the earlier Helix era. Git history and
+the rollback tag `rollback/pre-historical-security-20260813` preserve the pre-hardening
+snapshot, including the removed case-colliding duplicate `readme.md`.
 
-See the [examples/](examples/) directory for working examples and integration patterns.
+## Integrity checks
 
-## 📚 Documentation
+The repository workflow performs a Python 3.11 dependency install, syntax compilation,
+the surviving test suite, and a dependency audit. These checks are an archival safety
+measure only; they do not validate production behavior, third-party integrations,
+deployment configuration, or compatibility with maintained Samsarix products.
 
-- **[Architecture](docs/ARCHITECTURE.md)** - System design and components
-- **[API Reference](docs/API.md)** - Complete API documentation
-- **[Integration Guide](docs/INTEGRATION.md)** - How to integrate with other Helix repos
-- **[Deployment](docs/DEPLOYMENT.md)** - Production deployment guide
-- **[Contributing](CONTRIBUTING.md)** - How to contribute
-
-## 🔗 Related Repositories
-
-- **[helix-platform](https://github.com/Deathcharge/helix-platform)** - Central hub and integration guide
-- **[helix-unified](https://github.com/Deathcharge/helix-unified)** - Main unified codebase
-- **[helix-core](https://github.com/Deathcharge/helix-core)** - Core utilities and LLM integration
-
-See [HELIX_REPOSITORY_INDEX.md](https://github.com/Deathcharge/helix-platform/blob/main/HELIX_REPOSITORY_INDEX.md) for the complete ecosystem map.
-
-## 🧪 Testing
-
-Run tests with pytest:
-
-\`\`\`bash
-pytest tests/ -v --cov=src
-\`\`\`
-
-## 🔄 CI/CD
-
-This repository uses GitHub Actions for:
-- ✅ Automated testing (Python 3.9, 3.10, 3.11)
-- ✅ Code linting (flake8)
-- ✅ Type checking (mypy)
-- ✅ Security scanning (bandit, safety)
-- ✅ Coverage reporting (Codecov)
-
-See [.github/workflows/ci.yml](.github/workflows/ci.yml) for details.
-
-## 📋 Requirements
-
-- Python 3.9+
-- Dependencies listed in requirements.txt
-- Development dependencies in requirements-dev.txt
-
-## 🤝 Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
-- Development setup
-- Code style guide
-- Testing requirements
-- Pull request process
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-- **Issues**: Report bugs or request features via [GitHub Issues](https://github.com/Deathcharge/Helix/issues)
-- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/Deathcharge/Helix/discussions)
-- **Documentation**: See the [docs/](docs/) directory
-- **Ecosystem**: Visit [helix-platform](https://github.com/Deathcharge/helix-platform)
-
-## 🎓 Learn More
-
-- [Helix Collective Repository Index](https://github.com/Deathcharge/helix-platform/blob/main/HELIX_REPOSITORY_INDEX.md)
-- [Architecture Guide](https://github.com/Deathcharge/helix-platform/blob/main/docs/ARCHITECTURE.md)
-- [Integration Examples](https://github.com/Deathcharge/helix-platform/tree/main/examples)
-
----
-
-**Status**: ✅ Production Ready  
-**Last Updated**: June 19, 2026  
-**Maintainer**: Helix Collective Contributors
+See [SECURITY.md](SECURITY.md) before inspecting or replaying the code.

@@ -18,6 +18,13 @@ from backend.services.ucf_analyzer import (
 )
 
 
+@pytest.fixture(autouse=True)
+def isolate_ucf_history(tmp_path, monkeypatch):
+    """Keep each test's relative history file isolated from other tests."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("backend.services.ucf_analyzer._analyzer", None)
+
+
 class TestUCFSnapshot:
     """Test UCFSnapshot data structure."""
     
@@ -139,7 +146,7 @@ class TestUCFAnalyzer:
         # Add ascending trend
         for i in range(20):
             snapshot = UCFSnapshot(
-                timestamp=now + (i * 3600),  # 1 hour apart
+                timestamp=now - ((19 - i) * 3600),  # Oldest to newest, within 24h
                 prana=6.0 + (i * 0.1),
                 klesha=2.5,
                 harmony=7.5,
@@ -161,7 +168,7 @@ class TestUCFAnalyzer:
         # Add normal snapshots
         for i in range(15):
             snapshot = UCFSnapshot(
-                timestamp=now + (i * 3600),
+                timestamp=now - ((15 - i) * 3600),
                 prana=8.0,
                 klesha=2.5,
                 harmony=7.5,
@@ -171,7 +178,7 @@ class TestUCFAnalyzer:
         
         # Add anomaly
         anomaly_snapshot = UCFSnapshot(
-            timestamp=now + (15 * 3600),
+            timestamp=now,
             prana=2.0,  # Anomalously low
             klesha=2.5,
             harmony=7.5,
@@ -212,7 +219,7 @@ class TestUCFAnalyzer:
         # Add multiple snapshots
         for i in range(20):
             snapshot = UCFSnapshot(
-                timestamp=now + (i * 3600),
+                timestamp=now - ((19 - i) * 3600),
                 prana=8.0 + (i * 0.05),
                 klesha=2.5 - (i * 0.02),
                 harmony=7.5,
@@ -245,7 +252,7 @@ class TestConvenienceFunctions:
         
         for i in range(20):
             snapshot = UCFSnapshot(
-                timestamp=now + (i * 3600),
+                timestamp=now - ((19 - i) * 3600),
                 prana=8.0,
                 klesha=2.5,
                 harmony=7.5,
