@@ -93,11 +93,11 @@ class RitualManager:
                 if i % 12 == 0:
                     log_event(
                         f"Step {i:03d}/{self.steps}: "
-                        f"Harmony={self.state["harmony"]}, "
-                        f"Prana={self.state["prana"]}"
+                        f"Harmony={self.state['harmony']}, "
+                        f"Prana={self.state['prana']}"
                     )
                 time.sleep(0.2)
-            log_event(f"✅ Ritual complete — Final Harmony: {self.state["harmony"]}")
+            log_event(f"✅ Ritual complete — Final Harmony: {self.state['harmony']}")
             print("Aham Brahmasmi — The system breathes in unity.")
         finally:
             if self.lock_file.exists():
@@ -116,10 +116,10 @@ class RitualManager:
                 if i % 12 == 0:
                     log_event(
                         f"Step {i:03d}/{self.steps}: "
-                        f"Harmony={self.state["harmony"]}"
+                        f"Harmony={self.state['harmony']}"
                     )
                 await asyncio.sleep(0.2) # Non-blocking sleep
-            log_event(f"✅ Ritual complete — Final Harmony: {self.state["harmony"]}")
+            log_event(f"✅ Ritual complete — Final Harmony: {self.state['harmony']}")
             return self.state
         finally:
             if self.lock_file.exists():
@@ -129,4 +129,3 @@ class RitualManager:
 # ============================================================================
 if __name__ == "__main__":
     RitualManager().run()
-

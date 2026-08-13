@@ -29,7 +29,10 @@ async def manus(ctx, *, arg=None):
     elif arg.startswith("status"):
         if os.path.exists("Helix/state/heartbeat.json"):
             data = json.load(open("Helix/state/heartbeat.json"))
-            await ctx.send(f"🟢 Alive since {data["timestamp"]} | Harmony {data["ucf_state"].get("harmony",0):.3f}")
+            await ctx.send(
+                f"🟢 Alive since {data['timestamp']} | "
+                f"Harmony {data['ucf_state'].get('harmony', 0):.3f}"
+            )
         else:
             await ctx.send("🔴 No heartbeat found.")
 
@@ -38,8 +41,10 @@ async def heartbeat_check():
     chan = discord.utils.get(bot.get_all_channels(), name="agent-status")
     if chan and os.path.exists("Helix/state/heartbeat.json"):
         hb = json.load(open("Helix/state/heartbeat.json"))
-        msg = f"🤲 Heartbeat {hb["timestamp"]} | Harmony {hb["ucf_state"].get("harmony",0):.3f}"
+        msg = (
+            f"🤲 Heartbeat {hb['timestamp']} | "
+            f"Harmony {hb['ucf_state'].get('harmony', 0):.3f}"
+        )
         await chan.send(msg)
 
 bot.run(os.getenv("DISCORD_TOKEN"))
-
