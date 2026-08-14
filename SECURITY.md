@@ -23,3 +23,8 @@ shared code path.
 The repository history is retained intentionally. Potential credential or personal-data
 exposure in history should be reported privately to the owner rather than opened as a
 public issue.
+
+`Helix.env` is intentionally absent from the current tree. Removing a file from the tip
+does not erase it from Git history or invalidate any value it may have contained. Treat
+historical values as exposed: rotate them with their issuers and review deployment-secret
+stores. Do not paste suspected values into issues, pull requests, logs, or chat.
